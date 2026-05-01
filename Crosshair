@@ -20,7 +20,6 @@ local Crosshair = {
     ResizeMax = 22,
 }
 
--- SAFE Drawing constructor (no hookfunction)
 local function NewDrawing(Class, Props)
     local obj = Drawing.new(Class)
     for i,v in pairs(Props or {}) do
