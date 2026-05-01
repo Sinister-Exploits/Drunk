@@ -1,0 +1,148 @@
+local Crosshair = {
+    Enabled = true,
+    RefreshRate = 0,
+    Mode = 'mouse',
+    Position = Vector2.new(0,0),
+
+    Width = 1.5,
+    Length = 10,
+    Radius = 11,
+    Color = Color3.fromRGB(199, 110, 255),
+
+    Spin = true,
+    SpinSpeed = 150,
+    SpinMax = 340,
+    SpinStyle = Enum.EasingStyle.Sine,
+
+    Resize = true,
+    ResizeSpeed = 150,
+    ResizeMin = 5,
+    ResizeMax = 22,
+}
+
+-- SAFE Drawing constructor (no hookfunction)
+local function NewDrawing(Class, Props)
+    local obj = Drawing.new(Class)
+    for i,v in pairs(Props or {}) do
+        obj[i] = v
+    end
+    return obj
+end
+
+local RunService = game:GetService('RunService')
+local InputService = game:GetService('UserInputService')
+local TweenService = game:GetService('TweenService')
+local Camera = workspace.CurrentCamera
+
+local LastRender = 0
+
+local Drawings = {
+    Crosshair = {},
+    Text = {
+        NewDrawing('Text', {
+            Size = 13,
+            Font = 2,
+            Outline = true,
+            Text = 'tapbot',
+            Color = Color3.new(1,1,1)
+        }),
+        NewDrawing('Text', {
+            Size = 13,
+            Font = 2,
+            Outline = true,
+            Text = ".cc",
+            Color = Crosshair.Color
+        }),
+    },
+}
+
+for i = 1, 8 do
+    Drawings.Crosshair[i] = NewDrawing('Line', {
+        Visible = false
+    })
+end
+
+local function Solve(angle, radius)
+    local rad = math.rad(angle)
+    return Vector2.new(
+        math.sin(rad) * radius,
+        math.cos(rad) * radius
+    )
+end
+
+RunService.RenderStepped:Connect(function()
+    local now = time()
+
+    if not Crosshair.Enabled then
+        for i = 1, 8 do
+            Drawings.Crosshair[i].Visible = false
+        end
+        for _, t in pairs(Drawings.Text) do
+            t.Visible = false
+        end
+        return
+    end
+
+    if now - LastRender < Crosshair.RefreshRate then return end
+    LastRender = now
+
+    local Position =
+        (Crosshair.Mode == 'center' and Camera.ViewportSize / 2) or
+        (Crosshair.Mode == 'mouse' and InputService:GetMouseLocation()) or
+        Crosshair.Position
+
+    -- text
+    local TextX = Drawings.Text[1].TextBounds.X + Drawings.Text[2].TextBounds.X
+
+    Drawings.Text[1].Visible = true
+    Drawings.Text[2].Visible = true
+
+    Drawings.Text[1].Position =
+        Position + Vector2.new(
+            -TextX / 2,
+            Crosshair.Radius + (Crosshair.Resize and Crosshair.ResizeMax or Crosshair.Length) + 15
+        )
+
+    Drawings.Text[2].Position =
+        Drawings.Text[1].Position + Vector2.new(Drawings.Text[1].TextBounds.X)
+
+    Drawings.Text[2].Color = Crosshair.Color
+
+    for i = 1, 4 do
+        local Outline = Drawings.Crosshair[i]
+        local Inline = Drawings.Crosshair[i + 4]
+
+        local Angle = (i - 1) * 90
+        local Length = Crosshair.Length
+
+        -- spin
+        if Crosshair.Spin then
+            local spin = (-now * Crosshair.SpinSpeed) % Crosshair.SpinMax
+            Angle = Angle + TweenService:GetValue(
+                spin / 360,
+                Crosshair.SpinStyle,
+                Enum.EasingDirection.InOut
+            ) * 360
+        end
+
+        -- resize
+        if Crosshair.Resize then
+            local r = (now * Crosshair.ResizeSpeed) % 180
+            Length = Crosshair.ResizeMin + math.sin(math.rad(r)) * Crosshair.ResizeMax
+        end
+
+        -- inline
+        Inline.Visible = true
+        Inline.Color = Crosshair.Color
+        Inline.From = Position + Solve(Angle, Crosshair.Radius)
+        Inline.To = Position + Solve(Angle, Crosshair.Radius + Length)
+        Inline.Thickness = Crosshair.Width
+
+        -- outline
+        Outline.Visible = true
+        Outline.Color = Color3.new(0,0,0)
+        Outline.From = Position + Solve(Angle, Crosshair.Radius - 1)
+        Outline.To = Position + Solve(Angle, Crosshair.Radius + Length + 1)
+        Outline.Thickness = Crosshair.Width + 1.5
+    end
+end)
